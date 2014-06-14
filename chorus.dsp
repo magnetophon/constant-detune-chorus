@@ -8,13 +8,6 @@ declare coauthors	"ported from a pd patch by Scott Nordlund, 2011";
 /*
 
 Scott Nordlund, 2011
-
-Poisson distribution event generator
-en = enable (on/off)
-lam = lambda (mean number of events per second); determines density of events 
-min = minimum time between events in ms (this is clipped, not added). 
-The second outlet is useful for creating piecewise linear functions or automatically scaling envelope times. Note that unlike other abstractions, this doesn't use a separate "panel", and the inlets aren't in a sensible order due to a re-arranged layout. Usually "pois" parameters in other abstractions refer to the lambda setting here. If lam is set to a new value, it will take effect once the next event is triggered. If lam is set to a very low value, there may be a very long delay before the next event. In this case, it can be turned off and on once to restart with a new lambda value.
-
 http://puredata.hurleur.com/viewtopic.php?pid=29232#p29232
 Strangely it turns out that the equation used to warp the phase of the cosine into an approximate sawtooth is useful for other things. I've used it to control a piecewise linear random modulator, and in a chorus algorithm that maintains constant and symmetric detuning depth (in cents), regardless of modulation rate
 
@@ -35,21 +28,23 @@ import ("effect.lib");
 //-----------------------------------------------
 // contants
 //-----------------------------------------------
-noiseMax	= 6;	// the number of unique noise generators
+noiseMax	= 12;	// the number of unique noise generators
+poisStart	= noiseMax/2; //the start of the noises generators used by pois
 start = time<1; //the initial trigger for the SH
 //SampleRate = 44100;
 ms		= SR/1000; //milisecond in samples
 poisMin		= 667;
 poisMax 	= 4444;
+delMax		= 4096; //21ms at 192 kHz
 //-----------------------------------------------
 // the GUI
 //-----------------------------------------------
 chorusGroup(x)  = hgroup("[0]chorus", x);
 
-slowFreq	= chorusGroup(vslider("[0]slow freq",	1, 0, 1.25, 0.01):smooth(0.999));
-slowDepth	= chorusGroup(vslider("[1]slow depth",	0.3, 0, 1, 0.01):pow(2):smooth(0.999));
-fastFreq	= chorusGroup(vslider("[2]fast freq",	1, 0, 1.75, 0.01):smooth(0.999));
-fastDepth	= chorusGroup(vslider("[3]fast depth",	0.3, 0, 1, 0.01):pow(2):smooth(0.999));
+slowFreq	= chorusGroup(vslider("[0]slow freq",	1, 0, 5, 0.01):smooth(0.999));
+slowDepth	= chorusGroup(vslider("[1]slow depth",	0.3, 0, 5, 0.01):pow(2):smooth(0.999));
+fastFreq	= chorusGroup(vslider("[2]fast freq",	1, 0, 10, 0.01):smooth(0.999));
+fastDepth	= chorusGroup(vslider("[3]fast depth",	0.3, 0, 10, 0.01):pow(2):smooth(0.999));
 feedback	= chorusGroup(vslider("[4]feedback",	1, 0, 1, 0.01)
 *2:_-1<:(_,((_>0)+1)):/:smooth(0.999));
 //-----------------------------------------------
@@ -57,27 +52,71 @@ feedback	= chorusGroup(vslider("[4]feedback",	1, 0, 1, 0.01)
 //-----------------------------------------------
 SH(trig,x) = (*(1 - trig) + x * trig) ~_; //sample x and hold untill the next trig
 changePulse= _ <: _, mem: - : abs:_>(0); //one sample pulse at start
+noiseNr(nr) =(noises(noiseMax,nr)/2)+0.5;	// [0, 1] uniform
 
-pois(nr) = ((SH((_|start),noise):log:*(-1000):*(ms)) ~ (silentFor<:_,_)) :max(poisMin*ms):min(poisMax*ms):_/ms:vbargraph("foo", poisMin, poisMax)// split needed because SH uses x twice
+//-----------------------------------------------
+// Poisson distribution event generator
+//-----------------------------------------------
+/*
+en = enable (on/off)
+lam = lambda (mean number of events per second); determines density of events 
+min = minimum time between events in ms (this is clipped, not added). 
+The second outlet is useful for creating piecewise linear functions or automatically scaling envelope times. Note that unlike other abstractions, this doesn't use a separate "panel", and the inlets aren't in a sensible order due to a re-arranged layout. Usually "pois" parameters in other abstractions refer to the lambda setting here. If lam is set to a new value, it will take effect once the next event is triggered. If lam is set to a very low value, there may be a very long delay before the next event. In this case, it can be turned off and on once to restart with a new lambda value.
+*/
+pois(nr) = ((SH((_|start),noiseNr(nr+poisStart)):log:*(-1000):*(ms)) ~ (silentFor<:_,_)) :max(poisMin*ms):min(poisMax*ms):_/ms// split needed because SH uses x twice
 with {
-noise =(noises(noiseMax,nr)/2)+0.5;	// [0.05, 0.98] uniform
 silentFor(time) =  (countup((time:max(poisMin*ms):min(poisMax*ms)), ((time:changePulse)*_))==(time:max(poisMin*ms):min(poisMax*ms)))~_:changePulse;
 };
-//12:(+)~_;
-//log((noises(noiseMax,nr):SH(_|start))*(-1000):max(poisMin))~_;
+//:vbargraph("foo", poisMin, poisMax)
 
-//(((_<x),_:+)~(_<:_,_)) ; 
+//-----------------------------------------------
+// slow
+//-----------------------------------------------
+smin = slowFreq;
+smax = slowFreq*1.25;
+
+freq(Fmin,Fmax,nr) = ((SH((pois(nr):changePulse),noiseNr(nr))  * ((Fmax:log)-(Fmin:log))) + (Fmin:log)):exp ;
+
+slowD(nr) = (slowDepth:expr1:expr2) / freq(Fmin,Fmax,nr)
+  with {
+  expr1 = pow(2, _/1200);
+  expr2 = _<:(2000*(_-1)/(_+1));
+  };
+
+slowTotal(nr) = ((lf_sawpos(line(freq(smin,smax,nr), pois(nr)))-0.5):abs) * (line(((slowD(nr))),pois(nr)));
+//-----------------------------------------------
+// fast
+//-----------------------------------------------
+Fmin = fastFreq;
+Fmax = fastFreq*1.75;
 
 
-//process = silentfor(vslider("[4]feedback",	0, 0, 44100, 1),button("foo"));
-//process =  button("foo"):silentfor(vslider("[4]feedback",	0, 0, 1000*ms, 1));
-process = pois(1);
+fastD(nr) = (fastDepth:expr1:expr2) / freq(Fmin,Fmax,nr)
+  with {
+  expr1 = pow(2, _/1200);
+  expr2 = _<:(318.309886*(_-1)/(_+1));
+  };
+
+fastTotal(nr) = ((lf_sawpos(line(freq(Fmin,Fmax,nr), pois(nr))):sin:_+1) * (line((fastD(nr)),pois(nr))) );
+smoo = vslider("[3]smoo",	0, 0, 1, 0.01) * 1:_+0;
+//	<N>  = maximal delay in samples (must be a constant power of 2, for example 65536)
+//	<it> = interpolation time (in samples) for example 1024
+//	<dt> = delay time (in samples)
+//  <  > = input signal we want to delay
+//--------------------------------------------------------------------------
+
+//sdelay(N, it, dt)
+delayed(nr,add) = sdelay(delMax,2,((slowTotal(nr)+fastTotal(nr+1)+add)*ms));
+
+monoChorus(nr) = _<:delayed(0+nr,3),delayed(1+nr,7),delayed(2+nr,10):>_;
+
+stereoChorus = monoChorus(0),monoChorus(1);
+ //_:< delayed(0+nr,3),delayed(1+nr,7),delayed(2+nr,10):>_;
+
+process = stereoChorus;
+//_<:delayed(2,3),delayed(1,3);
 
 //process = vslider("[4]feedback",	0.5, 0.002, 0.995, 0.01):log:vbargraph("s", -10, 0);
-//vslider("[4]feedback",	1, 0, 1, 0.01):changePulse:vbargraph("s", -1, 1);
-//
-//SH(oscs(10)==1,(noises(noiseMax,1)/2)+0.5):vbargraph("s", -1, 2);
-//pois(2);
 
 
 
