@@ -28,7 +28,7 @@ import ("effect.lib");
 //-----------------------------------------------
 // contants
 //-----------------------------------------------
-noiseMax	= 12;	// the number of unique noise generators
+noiseMax	= 13;	// the number of unique noise generators
 poisStart	= noiseMax/2; //the start of the noises generators used by pois
 start = time<1; //the initial trigger for the SH
 //SampleRate = 44100;
@@ -41,12 +41,12 @@ delMax		= 4096; //21ms at 192 kHz
 //-----------------------------------------------
 chorusGroup(x)  = hgroup("[0]chorus", x);
 
-slowFreq	= chorusGroup(vslider("[0]slow freq",	1, 0, 5, 0.01):smooth(0.999));
-slowDepth	= chorusGroup(vslider("[1]slow depth",	0.3, 0, 5, 0.01):pow(2):smooth(0.999));
+slowFreq	= chorusGroup(vslider("[0]slow freq",	0.57, 0, 5, 0.01):smooth(0.999));
+slowDepth	= chorusGroup(vslider("[1]slow depth",	4, 0, 5, 0.01):pow(2):smooth(0.999));
 fastFreq	= chorusGroup(vslider("[2]fast freq",	1, 0, 10, 0.01):smooth(0.999));
-fastDepth	= chorusGroup(vslider("[3]fast depth",	0.3, 0, 10, 0.01):pow(2):smooth(0.999));
-feedback	= chorusGroup(vslider("[4]feedback",	1, 0, 1, 0.01)
-*2:_-1<:(_,((_>0)+1)):/:smooth(0.999));
+fastDepth	= chorusGroup(vslider("[3]fast depth",	4, 0, 10, 0.01):pow(2):smooth(0.999));
+feedback	= chorusGroup(vslider("[4]feedback",	0, -1, 1, 0.01)*0.8:smooth(0.999));
+
 //-----------------------------------------------
 // the DSP
 //-----------------------------------------------
@@ -63,14 +63,14 @@ lam = lambda (mean number of events per second); determines density of events
 min = minimum time between events in ms (this is clipped, not added). 
 The second outlet is useful for creating piecewise linear functions or automatically scaling envelope times. Note that unlike other abstractions, this doesn't use a separate "panel", and the inlets aren't in a sensible order due to a re-arranged layout. Usually "pois" parameters in other abstractions refer to the lambda setting here. If lam is set to a new value, it will take effect once the next event is triggered. If lam is set to a very low value, there may be a very long delay before the next event. In this case, it can be turned off and on once to restart with a new lambda value.
 */
-pois(nr) = ((SH((_|start),noiseNr(nr+poisStart)):log:*(-1000):*(ms)) ~ (silentFor<:_,_)) :max(poisMin*ms):min(poisMax*ms):_/ms// split needed because SH uses x twice
+pois(nr) = ((SH((_|start),noiseNr(nr+1)):log:*(-1000):*(ms)) ~ (silentFor<:_,_)) :max(poisMin*ms):min(poisMax*ms):_/ms// split needed because SH uses x twice
 with {
 silentFor(time) =  (countup((time:max(poisMin*ms):min(poisMax*ms)), ((time:changePulse)*_))==(time:max(poisMin*ms):min(poisMax*ms)))~_:changePulse;
 };
 //:vbargraph("foo", poisMin, poisMax)
 
 //-----------------------------------------------
-// slow
+// slow modulation
 //-----------------------------------------------
 smin = slowFreq;
 smax = slowFreq*1.25;
@@ -83,9 +83,9 @@ slowD(nr) = (slowDepth:expr1:expr2) / freq(Fmin,Fmax,nr)
   expr2 = _<:(2000*(_-1)/(_+1));
   };
 
-slowTotal(nr) = ((lf_sawpos(line(freq(smin,smax,nr), pois(nr)))-0.5):abs) * (line(((slowD(nr))),pois(nr)));
+slowTotal(nr) = ((lf_sawpos(line(freq(smin,smax,nr), pois(nr)))-0.5):abs) * (line((slowD(nr)),pois(nr)));
 //-----------------------------------------------
-// fast
+// fast modulation
 //-----------------------------------------------
 Fmin = fastFreq;
 Fmax = fastFreq*1.75;
@@ -98,25 +98,18 @@ fastD(nr) = (fastDepth:expr1:expr2) / freq(Fmin,Fmax,nr)
   };
 
 fastTotal(nr) = ((lf_sawpos(line(freq(Fmin,Fmax,nr), pois(nr))):sin:_+1) * (line((fastD(nr)),pois(nr))) );
-smoo = vslider("[3]smoo",	0, 0, 1, 0.01) * 1:_+0;
-//	<N>  = maximal delay in samples (must be a constant power of 2, for example 65536)
-//	<it> = interpolation time (in samples) for example 1024
-//	<dt> = delay time (in samples)
-//  <  > = input signal we want to delay
-//--------------------------------------------------------------------------
 
-//sdelay(N, it, dt)
-delayed(nr,add) = sdelay(delMax,2,((slowTotal(nr)+fastTotal(nr+1)+add)*ms));
 
-monoChorus(nr) = _<:delayed(0+nr,3),delayed(1+nr,7),delayed(2+nr,10):>_;
+//-----------------------------------------------
+// the chorus
+//-----------------------------------------------
 
-stereoChorus = monoChorus(0),monoChorus(1);
- //_:< delayed(0+nr,3),delayed(1+nr,7),delayed(2+nr,10):>_;
+delayed(nr,add) = sdelay(delMax,1024,((slowTotal(nr)+fastTotal(nr+1)+add)*ms));
+
+monoChorus(nr) = (_,_:+:_<:delayed(0+nr,3),delayed(2+nr,7),delayed(4+nr,10):>_)~( (_*feedback) : dcblockerat(200)*2: tanh*0.25) ;
+
+stereoChorus = monoChorus(0),monoChorus(6);
 
 process = stereoChorus;
-//_<:delayed(2,3),delayed(1,3);
-
-//process = vslider("[4]feedback",	0.5, 0.002, 0.995, 0.01):log:vbargraph("s", -10, 0);
-
 
 
