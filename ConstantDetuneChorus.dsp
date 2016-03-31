@@ -1,5 +1,5 @@
-declare name 		"Chorus";
-declare version 	"0.1";
+declare name 		"ConstantDetuneChorus";
+declare version 	"0.1.2";
 declare author 		"Bart Brouns";
 declare license 	"GNU 3.0";
 declare copyright 	"(c) Bart Brouns 2014";
@@ -59,8 +59,8 @@ noiseNr(nr) =(noises(noiseMax,nr)/2)+0.5;	// [0, 1] uniform
 //-----------------------------------------------
 /*
 en = enable (on/off)
-lam = lambda (mean number of events per second); determines density of events 
-min = minimum time between events in ms (this is clipped, not added). 
+lam = lambda (mean number of events per second); determines density of events
+min = minimum time between events in ms (this is clipped, not added).
 The second outlet is useful for creating piecewise linear functions or automatically scaling envelope times. Note that unlike other abstractions, this doesn't use a separate "panel", and the inlets aren't in a sensible order due to a re-arranged layout. Usually "pois" parameters in other abstractions refer to the lambda setting here. If lam is set to a new value, it will take effect once the next event is triggered. If lam is set to a very low value, there may be a very long delay before the next event. In this case, it can be turned off and on once to restart with a new lambda value.
 */
 pois(nr) = ((SH((_|start),noiseNr(nr+1)):log:*(-1000):*(ms)) ~ (silentFor<:_,_)) :max(poisMin*ms):min(poisMax*ms):_/ms// split needed because SH uses x twice
@@ -111,5 +111,3 @@ monoChorus(nr) = (_,_:+:_<:delayed(0+nr,3),delayed(2+nr,7),delayed(4+nr,10):>_)~
 stereoChorus = monoChorus(0),monoChorus(6);
 
 process = stereoChorus;
-
-
