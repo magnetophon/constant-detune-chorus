@@ -9,3 +9,5 @@
 *.0.temp-svg
 *.1.temp-svg
 *.2.temp-svg
+*.~undo-tree~
+*.lv2/
