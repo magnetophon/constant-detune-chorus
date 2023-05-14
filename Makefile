@@ -18,10 +18,10 @@ jaqt: $(JAQT_TARGETS)
 lv2: $(LV2_TARGETS)
 
 %: %.dsp
-	faust2jaqt -time -vec -double -t -1 $<
+	faust2jaqt -time -vec -t -1 $<
 
 %.lv2: %.dsp
-	faust2lv2 -uri-prefix $(LV2_URI_PREFIX) -time -vec -double -gui -t -1 $<
+	faust2lv2 -uri-prefix $(LV2_URI_PREFIX) -time -vec -gui -t -1 $<
 
 install-jaqt: $(JAQT_TARGETS)
 	install -d $(BINDIR)
