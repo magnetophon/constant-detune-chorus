@@ -1,8 +1,8 @@
 declare name 		"ConstantDetuneChorus";
-declare version 	"0.1.3";
+declare version 	"0.1.4";
 declare author 		"Bart Brouns";
-declare license 	"GNU 3.0";
-declare copyright 	"(c) Bart Brouns 2014";
+declare license 	"GPL-3.0";
+declare copyright 	"(c) Bart Brouns 2023";
 declare coauthors	"ported from a pd patch by Scott Nordlund, 2011";
 
 /*
