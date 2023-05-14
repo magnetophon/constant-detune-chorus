@@ -1,5 +1,5 @@
 declare name 		"ConstantDetuneChorus";
-declare version 	"0.1.4";
+declare version 	"0.1.5";
 declare author 		"Bart Brouns";
 declare license 	"GPL-3.0";
 declare copyright 	"(c) Bart Brouns 2023";
