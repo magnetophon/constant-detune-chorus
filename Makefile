@@ -24,8 +24,7 @@ lv2: $(LV2_TARGETS)
 
 %: %.dsp
 	PLUGIN_PRESETS_DIR="$(XDG_CONFIG_HOME)/$(basename $<)/"; \
-	mkdir -p "$$PLUGIN_PRESETS_DIR" || true; \
-	faust2jaqt -time -vec -t -1 -preset "$$PLUGIN_PRESETS_DIR" $<
+	faust2jaqt -time -vec -t -1 -preset auto $<
 
 %.lv2: %.dsp
 	faust2lv2 -uri-prefix $(LV2_URI_PREFIX) -time -vec -gui -t -1 $<
