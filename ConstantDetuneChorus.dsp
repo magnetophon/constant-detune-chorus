@@ -9,10 +9,15 @@ declare coauthors	"ported from a pd patch by Scott Nordlund, 2011";
 
 Scott Nordlund, 2011
 http://puredata.hurleur.com/viewtopic.php?pid=29232#p29232
-Strangely it turns out that the equation used to warp the phase of the cosine into an approximate os.sawtooth is useful for other things. I've used it to control a piecewise linear random modulator, and in a chorus algorithm that maintains constant and symmetric detuning depth (in cents), regardless of modulation rate
+Strangely it turns out that the equation used to warp the phase of the cosine into an approximate os.sawtooth is useful for other things.
+I've used it to control a piecewise linear random modulator, and in a chorus algorithm that maintains constant and symmetric detuning depth (in cents), regardless of modulation rate
 
 http://puredata.hurleur.com/viewtopic.php?pid=29407#p29407
-Now that I'm looking at it, I don't really remember exactly how this relates to the CZ phase distortion stuff, but it's in there somewhere. You can one equation to ho.map a [os.phasor~] to a piecewise linear function that turns a [cos~] into a phase distortion pseudo-os.sawtooth, or for controlling the distribution of a piecewise linear random modulator, or (if I remember right) to keep the "pitch shift up" and "pitch shift down" portions of a os.triangle-modulated de.delay symmetric. This last one isn't really obvious, but if you modulate a de.delay with a depth of, say, 1 octave, the rising portion will play back at 2x speed (+ 1 octave) while the falling portion will effectively "stop" the read pointer by slowing it to 0x speed (-infinite octaves, so to speak). The trick is to distort the os.triangle such that it's rising over one third of its ba.period and falling over two thirds. So then you get 2x alternating with 0.5x, as you'd expect.
+Now that I'm looking at it, I don't really remember exactly how this relates to the CZ phase distortion stuff, but it's in there somewhere.
+You can one equation to ho.map a [os.phasor~] to a piecewise linear function that turns a [cos~] into a phase distortion pseudo-os.sawtooth, or for controlling the distribution of a piecewise linear random modulator, or (if I remember right) to keep the "pitch shift up" and "pitch shift down" portions of a os.triangle-modulated de.delay symmetric.
+This last one isn't really obvious, but if you modulate a de.delay with a depth of, say, 1 octave, the rising portion will play back at 2x speed (+ 1 octave) while the falling portion will effectively "stop" the read pointer by slowing it to 0x speed (-infinite octaves, so to speak).
+The trick is to distort the os.triangle such that it's rising over one third of its ba.period and falling over two thirds.
+So then you get 2x alternating with 0.5x, as you'd expect.
 */
 
 //-----------------------------------------------
@@ -67,7 +72,12 @@ noiseNr(nr) =(no.noises(noiseMax,nr)/2)+0.5;	// [0, 1] uniform
 en = enable (on/off)
 lam = lambda (mean number of events per second); determines density of events
 min = minimum time between events in ms (this is clipped, not added).
-The second outlet is useful for creating piecewise linear functions or automatically scaling envelope times. Note that unlike other abstractions, this doesn't use a separate "panel", and the inlets aren't in a sensible order due to a re-arranged layout. Usually "pois" parameters in other abstractions refer to the lambda setting here. If lam is set to a new value, it will ba.take effect once the next event is triggered. If lam is set to a very low value, there may be a very long de.delay before the next event. In this case, it can be turned off and on once to restart with a new lambda value.
+The second outlet is useful for creating piecewise linear functions or automatically scaling envelope times.
+Note that unlike other abstractions, this doesn't use a separate "panel", and the inlets aren't in a sensible order due to a re-arranged layout.
+Usually "pois" parameters in other abstractions refer to the lambda setting here.
+If lam is set to a new value, it will ba.take effect once the next event is triggered.
+If lam is set to a very low value, there may be a very long de.delay before the next event.
+In this case, it can be turned off and on once to restart with a new lambda value.
 */
 pois(nr) = ((SH((_|start),noiseNr(nr+1)):log:*(-1000):*(ms)) ~ (silentFor<:_,_)) :max(poisMin*ms):min(poisMax*ms):_/ms// split needed because SH uses x twice
 with {
